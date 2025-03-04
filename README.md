@@ -6,8 +6,8 @@
 
 ## Инструментарий
 
-- VirtualBox
-- GNS3
+* VirtualBox
+* GNS3
 
 ## Этапы
 

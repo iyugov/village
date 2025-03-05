@@ -184,13 +184,13 @@
 7. Выполним копирование сгенерированного ключа на целевой сервер:
 
     ```sh
-    ssh-copy-id -i ~/.ssh/id_dhcp user@dhcp.village
+    ssh-copy-id -i ~/.ssh/id_dhcp user@dhcp
     ```
 
 8. Выполним вход по ключу:
 
     ```sh
-    ssh -i ~/.ssh/id_dhcp user@dhcp.village
+    ssh -i ~/.ssh/id_dhcp user@dhcp
     ```
 
     Авторизация должна пройти без запроса пароля.  

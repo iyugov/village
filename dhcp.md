@@ -292,14 +292,14 @@
     vim ~/.ssh/config
     ```
 
-    Обеспечим следующие содержание файла:  
+    Добавим в файл следующий раздел: 
 
     ```config
     Host dhcp
-    Hostname dhcp.village
-    Port 22
-    IdentityFile ~/.ssh/id_dhcp
-    IdentitiesOnly yes
+      Hostname dhcp.village
+      Port 22
+      IdentityFile ~/.ssh/id_dhcp
+      IdentitiesOnly yes
     ```
 
     Сохраним изменения, выйдем из редактора (`Esc`, `Shift`+`z`, `Shift`+`z`).

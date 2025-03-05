@@ -168,10 +168,10 @@
 
     ```config
     Host ns
-    Hostname 10.0.1.3
-    Port 22
-    IdentityFile ~/.ssh/id_ns
-    IdentitiesOnly yes
+      Hostname 10.0.1.3
+      Port 22
+      IdentityFile ~/.ssh/id_ns
+      IdentitiesOnly yes
     ```
 
     Сохраним изменения, выйдем из редактора (`Esc`, `Shift`+`z`, `Shift`+`z`).

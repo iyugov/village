@@ -100,7 +100,7 @@
 23. проверим разрешение имён:
 
     ```sh
-    nslookup ns.village
+    nslookup ns
     nslookup 10.0.1.3
     ```
 

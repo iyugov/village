@@ -30,3 +30,7 @@
 9. [Создание сервера репликации баз данных MySQL](mysql-replication.md)
 
 10. [Создание сервера баз данных PostgreSQL](postgresql.md)
+
+11. [Создание коммутатора серверов баз данных](db-server-switch.md)
+
+12. [Создание сервера репликации баз данных PostgreSQL](postgresql-replication.md)

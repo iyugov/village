@@ -228,7 +228,7 @@
 
     Сохраним изменения, выйдем из редактора (`Esc`, `Shift`+`z`, `Shift`+`z`).
 
-13. Выполним вход на сервер имён с учётом настроек:
+13. Выполним вход на сервер с учётом настроек:
 
     ```sh
     ssh db2
@@ -236,7 +236,7 @@
 
     Авторизация должна пройти автоматически.
 
-14. В настройках хоста "DB1" в GNS3 установим флажок "Start VM in headless mode", остановим и запустим хост.
+14. В настройках хоста "DB2" в GNS3 установим флажок "Start VM in headless mode", остановим и запустим хост.
 
 #### Настройка fail2ban на сервере
 
@@ -365,12 +365,103 @@
 
     ```sh
     createuser -P admin
+    exit
     ```
 
-    Зададим пароль этого пользователя.
+    Зададим пароль этого пользователя. Вернёмся к пользователю `user`.
 
 4. Установим правило межсетевого экрана для PostgreSQL:
 
     ```sh
-    sudo ufw allow PostgreSQL
+    sudo ufw allow postgresql
+    ```
+
+### Создание базы данных на сервере
+
+1. На сервере "DB2" запустим консоль сервера PostgreSQL:
+
+    ```sh
+    sudo -u postgres psql
+    ```
+
+2. Создадим базу данных `campus`:
+
+    ```sql
+    CREATE DATABASE campus;
+    ```
+
+3. Сделаем созданную базу данных текущей:
+
+    ```sql
+    \c campus;
+    ```
+
+4. Создадим таблицу `students`:
+
+    ```sql
+    CREATE TABLE students (
+        id SERIAL PRIMARY KEY,
+        first_name VARCHAR(50) NOT NULL,
+        last_name VARCHAR(50) NOT NULL,
+        birth_date DATE,
+        email VARCHAR(100) UNIQUE NOT NULL
+    );
+    ```
+
+5. Создадим таблицу `courses`:
+
+    ```sql
+    CREATE TABLE courses (
+        id SERIAL PRIMARY KEY,
+        course_title VARCHAR(100) NOT NULL,
+        credits INT,
+        description TEXT
+    );
+    ```
+
+6. Создадим таблицу `enrollments`:
+
+    ```sql
+    CREATE TABLE enrollments (
+        id SERIAL PRIMARY KEY,
+        student_id INT NOT NULL,
+        course_id INT NOT NULL,
+        enrollment_date DATE,
+        grade CHAR(1),
+        CONSTRAINT fk_student
+            FOREIGN KEY (student_id) 
+            REFERENCES students(id)
+            ON DELETE CASCADE,
+        CONSTRAINT fk_course
+            FOREIGN KEY (course_id) 
+            REFERENCES courses(id)
+            ON DELETE CASCADE
+    );
+    ```
+
+7. Внесём в таблицы начальные данные:
+
+    ```sql
+    INSERT INTO students (first_name, last_name, birth_date, email) VALUES
+    ('Иван', 'Иванов', '1990-05-15', 'ivanov@example.com'),
+    ('Мария', 'Петрова', '1992-08-22', 'petrova@example.com'),
+    ('Пётр', 'Сидоров', '1988-12-03', 'sidorov@example.com');
+    
+    INSERT INTO courses (course_title, credits, description) VALUES
+    ('Математика', 5, 'Основы алгебры и геометрии'),
+    ('История', 3, 'Изучение истории древнего мира'),
+    ('Компьютерные науки', 4, 'Введение в программирование и алгоритмы');
+    
+    INSERT INTO enrollments (student_id, course_id, enrollment_date, grade) VALUES
+    (1, 1, '2023-09-01', 'A'),
+    (2, 2, '2023-09-02', 'B'),
+    (3, 3, '2023-09-03', 'A'),
+    (1, 3, '2023-09-04', 'B'),
+    (2, 1, '2023-09-05', 'C');
+    ```
+
+8. Выйдем из консоли:
+
+    ```sql
+    \q
     ```

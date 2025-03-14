@@ -34,3 +34,5 @@
 11. [Создание коммутатора серверов баз данных](db-server-switch.md)
 
 12. [Создание сервера репликации баз данных PostgreSQL](postgresql-replication.md)
+
+13. [Создание сервера Samba](smb.md)

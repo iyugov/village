@@ -36,3 +36,5 @@
 12. [Создание сервера репликации баз данных PostgreSQL](postgresql-replication.md)
 
 13. [Создание сервера Samba](smb.md)
+
+14. [Создание сервера NFS](nfs.md)

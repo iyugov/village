@@ -2,12 +2,13 @@
 
 ## Описание
 
-Создаётся сервер мониторинга на базе Ubuntu Server 24.04 с RAID 1 и Zabbix. Сервер имеет адрес 10.0.1.12/24.
+Создаётся сервер мониторинга на базе Ubuntu Server 24.04 с RAID 1 и Zabbix с использованием локальных серверов MySQL и Apache. Сервер имеет адрес 10.0.1.12/24.
 Обеспечиваются базовые параметры безопасности.
 
 ## Требования
 
 * [Создание коммутаторов сегментов серверов](server-segments-switches.md)
+* [Создание хоста графического клиента](client-gui.md)
 
 ## Выполнение
 
@@ -349,3 +350,114 @@
     ```
 
 10. Проверим отправку сообщений при блокировке. Также уведомления будут отправляться о запуске и завершении работы *fail2ban*.
+
+### Установка Zabbix
+
+*На сайте <https://www.zabbix.com/download> можно выбрать параметры установки и получить команды для неё.*
+
+*Описываемым параметрам установки соответствует следующая ссылка:
+<https://www.zabbix.com/download?zabbix=7.2&os_distribution=ubuntu&os_version=24.04&components=server_frontend_agent&db=mysql&ws=apache>*
+
+1. На сервере "Monitoring" загрузим пакет с источниками пакетов Zabbix, установим источники, удалим файл пакета, а затем установим сами компоненты Zabbix, а также сервер MySQL:
+
+    ```sh
+    sudo wget https://repo.zabbix.com/zabbix/7.2/release/ubuntu/pool/main/z/zabbix-release/zabbix-release_latest_7.2+ubuntu24.04_all.deb
+    sudo dpkg -i zabbix-release_latest_7.2+ubuntu24.04_all.deb
+    rm zabbix-release_latest_7.2+ubuntu24.04_all.deb
+    sudo apt update
+    sudo apt install zabbix-server-mysql zabbix-frontend-php zabbix-apache-conf zabbix-sql-scripts zabbix-agent mysql-server
+    ```
+
+2. Откроем консоль сервера MySQL:
+
+    ```sh
+    sudo mysql
+    ```
+
+3. Создадим базу данных `zabbix`, пользователя `zabbix` для неё (вместо `password` зададим пароль пользователя), установим флаг доверия создаваемым функциям (для импорта конфигурации) и выйдем из консоли:
+
+    ```sql
+    CREATE DATABASE zabbix CHARACTER SET utf8mb4 COLLATE utf8mb4_bin;
+    CREATE USER 'zabbix'@'localhost' IDENTIFIED BY 'password';
+    GRANT ALL PRIVILEGES ON zabbix.* TO 'zabbix'@'localhost';
+    SET GLOBAL log_bin_trust_function_creators = 1;
+    EXIT;
+    ```
+
+4. Импортируем конфигурацию базы данных для Zabbix:
+
+    ```sh
+    zcat /usr/share/zabbix/sql-scripts/mysql/server.sql.gz | mysql --default-character-set=utf8mb4 -uzabbix -p zabbix
+    ```
+
+    Введём пароль для пользователя `zabbix` базы данных.
+    Дождёмся окончания импорта.
+
+5. Откроем консоль сервера MySQL:
+
+    ```sh
+    sudo mysql
+    ```
+
+6. Снимем флаг доверия создаваемым функциям (для импорта конфигурации) и выйдем из консоли:
+
+    ```sql
+    EXIT;
+    ```
+
+7. Откроем файл конфигурации сервера Zabbix:
+
+    ```sh
+    sudo vim /etc/zabbix/zabbix_server.conf
+    ```
+
+8. В файле раскомментируем строку с параметром `DBPassword` или допишем новую такую строку и в качестве значения параметра укажем пароль для пользователя `zabbix` базы данных (вместо `password`):
+
+    ```config
+    DBPassword=password
+    ```
+
+    Сохраним изменения, выйдем из редактора (`Esc`, `Shift`+`z`, `Shift`+`z`).
+
+9. Перезапустим и включим в автоматическую загрузку служб Zabbix и веб-сервера:
+
+    ```sh
+    sudo systemctl restart zabbix-server zabbix-agent apache2
+    sudo systemctl enable zabbix-server zabbix-agent apache2
+    ```
+
+10. Установим правило межсетевого экрана для веб-сервера (HTTP):
+
+    ```sh
+    sudo ufw allow http
+    ```
+
+11. На хосте "Client2" в веб-браузере откроем адрес <http://monitoring/zabbix>.
+
+    *Альтернатива: воспользоваться пробросом портов на хост внешней сети (`ssh -f -N -L 8080:monitoring:80 user@192.168.122.201 -p 4224`) и в веб-браузере открыть адрес <http://localhost:8080/zabbix>*
+
+12. В веб-браузере выберем язык: "English (en_US)". Нажмём кнопку "Next step".
+
+13. Проверим предварительные требования (везде должны стоять отметки "OK"). Нажмём кнопку "Next step".
+
+14. Укажем параметры подключения:
+    * тип базы данных - MySQL;
+    * хост базы данных - `localhost`;
+    * порт базы данных - 0 (по умолчанию);
+    * имя базы данных - `zabbix`;
+    * хранение учётных данных - в простоим текстовом формате;
+    * имя пользователя - `zabbix`;
+    * пароль - тот пароль, который был установлен для этого пользователя базы данных.
+    Нажмём кнопку "Next step".
+
+15. Зададим имя сервера Zabbix - "Monitoring". Выберем часовой пояс - "(UTC+03:00) Europe/Moscow". Выберем тему оформления по умолчанию - "Blue". Нажмём кнопку "Next step".
+
+16. Проверим ранее указанные параметры настройки. При необходимости - вернёмся назад (кнопки "Back") и скорректируем настройки. Нажмём кнопку "Next step".
+
+17. Дождёмся окончания установки. Нажмём кнопку "Finish".
+
+18. Авторизуемся в Zabbix с помощью имени пользователя "Admin" и пароля "zabbix".
+
+19. Слева в разделе "User settings" выберем пункт "Profile". Нажмём кнопку "Change password". Введём прежний пароль и зададим новый пароль, указав его дважды. Нажмём кнопку "Upgrade". Согласимся на завершение сеанса.
+
+20. Авторизуемся в Zabbix с именем пользователя "Admin" и установленным паролем.

@@ -397,7 +397,7 @@
     ```sh
     sudo openssl genpkey -algorithm ed25519 -out private/db1_mysql_key.pem
     sudo openssl req -new -key private/db1_mysql_key.pem -out requests/db1_mysql.csr -subj "/CN=db1"
-    sudo openssl x509 -req -in requests/db1_mysql.csr -CA ca_cert.pem -CAkey private/ca_key.pem -out newcerts/db1_mysql_cert.pem -days 3653 -CAcreateserial
+    sudo openssl x509 -req -in requests/db1_mysql.csr -CA cacert.pem -CAkey private/cakey.pem -out newcerts/db1_mysql_cert.pem -days 3653 -CAcreateserial
     ```
 
 3. Создадим ключ и сертификат для сервера MySQL `db1r`:
@@ -405,34 +405,34 @@
     ```sh
     sudo openssl genpkey -algorithm ed25519 -out private/db1r_mysql_key.pem
     sudo openssl req -new -key private/db1r_mysql_key.pem -out requests/db1r_mysql.csr -subj "/CN=db1r"
-    sudo openssl x509 -req -in requests/db1r_mysql.csr -CA ca_cert.pem -CAkey private/ca_key.pem -out newcerts/db1r_mysql_cert.pem -days 3653 -CAcreateserial
+    sudo openssl x509 -req -in requests/db1r_mysql.csr -CA cacert.pem -CAkey private/cakey.pem -out newcerts/db1r_mysql_cert.pem -days 3653 -CAcreateserial
     ```
 
 4. Скопируем необходмые ключи и сертификаты в каталог пользователя для копирования его на серверы по `scp`, перейдём в этот каталог и установим пользователю права на файлы:
 
     ```sh
-    sudo cp ca_cert.pem newcerts/db1_mysql_cert.pem newcerts/db1r_mysql_cert.pem private/db1_mysql_key.pem private/db1r_mysql_key.pem /home/user
+    sudo cp cacert.pem newcerts/db1_mysql_cert.pem newcerts/db1r_mysql_cert.pem private/db1_mysql_key.pem private/db1r_mysql_key.pem /home/user
     cd /home/user
-    sudo chown user:user ca_cert.pem db1_mysql_cert.pem db1r_mysql_cert.pem db1_mysql_key.pem db1r_mysql_key.pem
+    sudo chown user:user cacert.pem db1_mysql_cert.pem db1r_mysql_cert.pem db1_mysql_key.pem db1r_mysql_key.pem
     ```
 
-5. На сервере "Access" скопируем файлы ключей и сертификатов  между каталогами пользователей сервера "CA" и сервера "DB1":
+5. На сервере "Access" скопируем файлы ключей и сертификатов между каталогами пользователей сервера "CA" и сервера "DB1":
 
     ```sh
-    scp ca:/home/user/{ca_cert.pem,db1_mysql_cert.pem,db1r_mysql_cert.pem,db1_mysql_key.pem,db1r_mysql_key.pem} db1:/home/user
+    scp ca:/home/user/{cacert.pem,db1_mysql_cert.pem,db1r_mysql_cert.pem,db1_mysql_key.pem,db1r_mysql_key.pem} db1:/home/user
     ```
 
 6. На сервере "Access" скопируем файлы ключей и сертификатов между каталогами пользователей сервера "CA" и сервера "DB1R":
 
     ```sh
-    scp ca:/home/user/{ca_cert.pem,db1_mysql_cert.pem,db1r_mysql_cert.pem,db1_mysql_key.pem,db1r_mysql_key.pem} db1r:/home/user
+    scp ca:/home/user/{cacert.pem,db1_mysql_cert.pem,db1r_mysql_cert.pem,db1_mysql_key.pem,db1r_mysql_key.pem} db1r:/home/user
     ```
 
-7. На сервере "CA" удалим файлы ключей и сертификатов  из каталога пользователя:
+7. На сервере "CA" удалим файлы ключей и сертификатов из каталога пользователя:
 
     ```sh
     cd /home/user
-    rm ca_cert.pem db1_mysql_cert.pem db1r_mysql_cert.pem db1_mysql_key.pem db1r_mysql_key.pem
+    rm cacert.pem db1_mysql_cert.pem db1r_mysql_cert.pem db1_mysql_key.pem db1r_mysql_key.pem
     ```
 
 8. На сервере "DB1" создадим каталог для сертификатов и ключей, скопируем файлы в него, установим права:
@@ -440,7 +440,7 @@
     ```sh
     cd /home/user
     sudo mkdir /etc/mysql/ssl
-    sudo mv ca_cert.pem db1_mysql_cert.pem db1r_mysql_cert.pem db1_mysql_key.pem db1r_mysql_key.pem /etc/mysql/ssl
+    sudo mv cacert.pem db1_mysql_cert.pem db1r_mysql_cert.pem db1_mysql_key.pem db1r_mysql_key.pem /etc/mysql/ssl
     sudo chown -R mysql:mysql /etc/mysql/ssl
     sudo chmod -R 600 /etc/mysql/ssl
     sudo chmod 700 /etc/mysql/ssl
@@ -451,7 +451,7 @@
     ```sh
     cd /home/user
     sudo mkdir /etc/mysql/ssl
-    sudo mv ca_cert.pem db1_mysql_cert.pem db1r_mysql_cert.pem db1_mysql_key.pem db1r_mysql_key.pem /etc/mysql/ssl
+    sudo mv cacert.pem db1_mysql_cert.pem db1r_mysql_cert.pem db1_mysql_key.pem db1r_mysql_key.pem /etc/mysql/ssl
     sudo chown -R mysql:mysql /etc/mysql/ssl
     sudo chmod -R 600 /etc/mysql/ssl
     sudo chmod 700 /etc/mysql/ssl
@@ -472,7 +472,7 @@
     server-id = 1
     log_bin = /var/log/mysql/mysql-bin.log
     binlog_do_db = campus
-    ssl_ca = /etc/mysql/ssl/ca_cert.pem
+    ssl_ca = /etc/mysql/ssl/cacert.pem
     ssl_cert = /etc/mysql/ssl/db1_mysql_cert.pem
     ssl_key = /etc/mysql/ssl/db1_mysql_key.pem
     require_secure_transport=ON
@@ -539,36 +539,38 @@
     sudo mysql < /home/user/dump.sql && rm /home/user/dump.sql
     ```
 
-12. На сервере "DB1R" откроем файл конфигурации сервера MySQL:
+#### Настройка сервера репликации
+
+1. На сервере "DB1R" откроем файл конфигурации сервера MySQL:
 
     ```sh
     sudo vim /etc/mysql/mysql.conf.d/mysqld.cnf
     ```
 
-13. В разделе `[mysql]` установим, при необходимости раскомментировав или дописав, значения параметров:
+2. В разделе `[mysql]` установим, при необходимости раскомментировав или дописав, значения параметров:
 
     ```config
     server-id = 2
     relay-log = /var/log/mysql/relay-bin.log
-    ssl_ca = /etc/mysql/ssl/ca_cert.pem
+    ssl_ca = /etc/mysql/ssl/cacert.pem
     ssl_cert = /etc/mysql/ssl/db1_mysql_cert.pem
     ssl_key = /etc/mysql/ssl/db1_mysql_key.pem
     require_secure_transport=ON
     ```
 
-14. Перезапустим сервер MySQL:
+3. Перезапустим сервер MySQL:
 
     ```sh
     sudo systemctl restart mysql
     ```
 
-15. Запустим консоль сервера MySQL:
+4. Запустим консоль сервера MySQL:
 
     ```sh
     sudo mysql
     ```
 
-16. Выполним настройку репликации, заменив значения параметров `MASTER_LOG_FILE` и `MASTER_LOG_POS` ранее записанными значениями имени файла и позиции, а значение параметра `MASTER_PASSWORD` - паролем пользователя `replicator` на сервера MySQL `db1`:
+5. Выполним настройку репликации, заменив значения параметров `MASTER_LOG_FILE` и `MASTER_LOG_POS` ранее записанными значениями имени файла и позиции, а значение параметра `MASTER_PASSWORD` - паролем пользователя `replicator` на сервера MySQL `db1`:
 
     ```sql
     CHANGE MASTER TO
@@ -578,18 +580,18 @@
         MASTER_LOG_FILE='mysql-bin.000001',
         MASTER_LOG_POS=715,
         MASTER_SSL=1,
-        MASTER_SSL_CA='/etc/mysql/ssl/ca_cert.pem',
+        MASTER_SSL_CA='/etc/mysql/ssl/cacert.pem',
         MASTER_SSL_CERT='/etc/mysql/ssl/db1r_mysql_cert.pem',
         MASTER_SSL_KEY='/etc/mysql/ssl/db1r_mysql_key.pem';
     ```
 
-17. Запустим репликацию:
+6. Запустим репликацию:
 
     ```sql
     START SLAVE;
     ```
 
-18. Проверим статус репликации:
+7. Проверим статус репликации:
 
     ```sql
     SHOW SLAVE STATUS\G;

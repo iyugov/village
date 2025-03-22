@@ -91,7 +91,7 @@
     ```config
     [ CA_default ]
 
-    dir =    ./ca    # Where everything is kept
+    dir =    /etc/ssl/ca    # Where everything is kept
     ```
 
 3. В файле после строки `[ req_distinguished_name ]` изменим значения следующих строк (при отсутствии каких-то строк — допшем их, убедившись, что перед ними не поставлен знак «#»):
@@ -101,11 +101,13 @@
 
     countryName_default               = RU
     ...
-    stateOrProvinceName_default       = Тверская область
+    stateOrProvinceName_default       = Tver region
+    ...
+    localityName_default              = Tver
     ...
     0.organizationName_default        = Village
     ...
-    0.organizationalUnitName_default  = УЦ
+    0.organizationalUnitName_default  = CA
     ...
     commonName_default                = village
     ...
@@ -139,7 +141,7 @@
 7. Создадим дополнительные каталоги:
 
     ```sh
-    sudo mkdir newcerts certs crl private requests
+    sudo mkdir newcerts certs crl private requests revoke
     ```
 
 8. Создадим файлы индекса базы данных:
@@ -159,24 +161,22 @@
     Начнём генерацию ключа:
 
     ```sh
-    sudo openssl req -new -newkey ed25519 -sha256 -days 3653 -nodes -x509 -extensions v3_ca -utf8 -set_serial 0 -out /etc/ssl/ca/ca_cert.pem -keyout /etc/ssl/ca/private/ca_key.pem
+    sudo openssl req -new -newkey rsa:4096 -sha256 -days 3653 -nodes -x509 -extensions v3_ca -utf8 -set_serial 0 -out /etc/ssl/ca/cacert.pem -keyout /etc/ssl/ca/private/cakey.pem
     ```
-
-    Введём пароль ключа, заданный ранее.
 
     На запросы всех параметров ответим нажатием Enter, т. к. все параметры соответствуют параметрам, заданным в настройках OpenSSL по умолчанию:
 
     ```config
     Country Name (2 letter code) [RU]:
-    State or Province Name (full name) [Тверская область]:
-    Locality Name (eg, city) []:
+    State or Province Name (full name) [Tver region]:
+    Locality Name (eg, city) [Tver]:
     Organization Name (eg, company) [Village]:
-    Organizational Unit Name (eg, section) [УЦ]:
+    Organizational Unit Name (eg, section) [CA]:
     Common Name (e.g. server FQDN or YOUR name) [village]:
     Email Address [admin@village]:
     ```
 
-    Сгенерированный сертификат находится в файле /etc/ssl/ca/ca_cert.pem и действует 10 лет (3653 дня).
+    Сгенерированный сертификат находится в файле /etc/ssl/ca/cacert.pem и действует 10 лет (3653 дня).
 
 11. Зададим права доступа к каталогу удостоверяющего центра - на чтение для всех, на запись только для владельца (суперпользователя):
 

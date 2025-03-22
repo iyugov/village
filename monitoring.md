@@ -3,7 +3,7 @@
 ## Описание
 
 Создаётся сервер мониторинга на базе Ubuntu Server 24.04 с RAID 1 и Zabbix с использованием локальных серверов MySQL и Apache. Сервер имеет адрес 10.0.1.12/24.
-Обеспечиваются базовые параметры безопасности.
+Обеспечиваются базовые параметры безопасности. Настраивается базовый мониторинг имеющихся серверов по ICMP ping.
 
 ## Требования
 
@@ -461,3 +461,235 @@
 19. Слева в разделе "User settings" выберем пункт "Profile". Нажмём кнопку "Change password". Введём прежний пароль и зададим новый пароль, указав его дважды. Нажмём кнопку "Upgrade". Согласимся на завершение сеанса.
 
 20. Авторизуемся в Zabbix с именем пользователя "Admin" и установленным паролем.
+
+### Настройка веб-сервера для мониторинга
+
+#### Настройка перенаправления
+
+1. В консоли хоста "Monitoring" откроем файл конфигурации сайта веб-сервера:
+
+    ```sh
+    sudo vim /etc/apache2/sites-enabled/000-default.conf
+    ```
+
+2. В разделе `<VirtualHost *:80>` добавим настройку перенаправления на каталог "Zabbix":
+
+    ```config
+    RedirectMatch 301 ^/$ /zabbix/
+    ```
+
+    Сохраним изменения, выйдем из редактора (`Esc`, `Shift`+`z`, `Shift`+`z`).
+
+3. Перезапустим службу веб-сервера:
+
+    ```sh
+    sudo systemctl restart apache2
+    ```
+
+#### Создание ключей и сертификатов
+
+1. На сервере "CA" перейдём в каталог удостоверяющего центра:
+
+    ```sh
+    cd /etc/ssl/ca
+    ```
+
+2. Создадим ключ и сертификат для веб-сервера `monitoring`:
+
+    ```sh
+    sudo openssl req -new -x509 -nodes -newkey rsa:4096 -days 3653 -utf8 -extensions v3_ca -out /etc/ssl/ca/certs/monitoring_https_cert.pem -keyout /etc/ssl/ca/private/monitoring_https_key.pem
+    ```
+
+    На запросы всех параметров, кроме параметров "Organizational Unit Name" и "Common Name" ответим нажатием Enter, т. к. эти параметры соответствуют параметрам, заданным в настройках OpenSSL по умолчанию; для параметра "Organizational Unit Name" зададим значение `Monitoring`; для параметра "Common Name" зададим значение `monitoring`:
+
+    ```config
+    Country Name (2 letter code) [RU]:
+    State or Province Name (full name) [Tver region]:
+    Locality Name (eg, city) [Tver]:
+    Organization Name (eg, company) [Village]:
+    Organizational Unit Name (eg, section) [CA]: Monitoring
+    Common Name (e.g. server FQDN or YOUR name) [village]: monitoring
+    Email Address [admin@village]:
+    ```
+
+    Сгенерированный сертификат находится в файле /etc/ssl/ca/cacert.pem и действует 10 лет (3653 дня).
+
+3. Сгенерируем запрос на подпись сертификата:
+
+    ```sh
+    sudo openssl req -new -utf8 -key /etc/ssl/ca/private/monitoring_https_key.pem -out /etc/ssl/ca/requests/monitoring_https.csr
+    ```
+
+    На запросы всех параметров, кроме параметров "Organizational Unit Name" и "Common Name" ответим нажатием Enter, т. к. эти параметры соответствуют параметрам, заданным в настройках OpenSSL по умолчанию; для параметра "Organizational Unit Name" зададим значение `Monitoring`; для параметра "Common Name" зададим значение `monitoring`:
+
+    ```config
+    Country Name (2 letter code) [RU]:
+    State or Province Name (full name) [Tver region]:
+    Locality Name (eg, city) [Tver]:
+    Organization Name (eg, company) [Village]:
+    Organizational Unit Name (eg, section) [CA]: Monitoring
+    Common Name (e.g. server FQDN or YOUR name) [village]: monitoring
+    Email Address [admin@village]:
+
+    Please enter the following 'extra' attributes
+    to be sent with your certificate request
+    A challenge password []:
+    An optional company name []:
+    ```
+
+4. Создадим файл доменов для сертификата и откроем его в редекторе:
+
+    ```sh
+    sudo vim domains.txt
+    ```
+
+5. В редакторе обеспечим следующие содержимое файла:
+
+    ```config
+    authorityKeyIdentifier=keyid,issuer
+    keyUsage = digitalSignature, nonRepudiation, keyEncipherment, dataEncipherment
+    subjectAltName = @alt_names
+    [alt_names]
+    DNS.1 = monitoring
+    DNS.2 = monitoring.village
+    ```
+
+    Сохраним изменения, выйдем из редактора (`Esc`, `Shift`+`z`, `Shift`+`z`).
+
+6. Подпишем сертификат:
+
+    ```sh
+    sudo openssl x509 -req -in requests/monitoring_https.csr -CA cacert.pem -CAkey private/cakey.pem -out newcerts/monitoring_https_cert.pem -days 3653 -CAcreateserial -etxfile domains.txt
+    ```
+
+7. Скопируем необходмые ключи и сертификаты в каталог пользователя для копирования его на серверы по `scp`, перейдём в этот каталог и установим пользователю права на файлы:
+
+    ```sh
+    sudo cp cacert.pem newcerts/monitoring_https_cert.pem private/monitoring_https_key.pem /home/user
+    cd /home/user
+    sudo chown user:user cacert.pem monitoring_https_cert.pem monitoring_https_key.pem
+    ```
+
+8. На сервере "Access" скопируем файлы ключей и сертификатов между каталогами пользователей сервера "CA" и сервера "Monitoring":
+
+    ```sh
+    scp ca:/home/user/{cacert.pem,monitoring_https_cert.pem,monitoring_https_key.pem} monitoring:/home/user
+    ```
+
+9. На сервере "CA" удалим файлы ключей и сертификатов из каталога пользователя:
+
+    ```sh
+    cd /home/user
+    rm cacert.pem monitoring_https_cert.pem monitoring_https_key.pem
+    ```
+
+10. На сервере "Monitoring" создадим каталог для сертификатов и ключей, скопируем файлы в него, установим права:
+
+    ```sh
+    cd /home/user
+    sudo mkdir /etc/apache2/ssl
+    sudo mv cacert.pem monitoring_https_cert.pem monitoring_https_key.pem /etc/apache2/ssl
+    sudo chown -R www-data:www-data /etc/apache2/ssl
+    sudo chmod -R 600 /etc/apache2/ssl
+    sudo chmod 700 /etc/apache2/ssl
+    ```
+
+11. Откроем файл конфигурации сайта веб-сервера:
+
+    ```sh
+    sudo vim /etc/apache2/sites-enabled/000-default.conf
+    ```
+
+12. Добавим в файл раздел для HTTPS:
+
+    ```config
+    <VirtualHost *:443>
+        ServerName monitoring.village
+        ServerAdmin webmaster@localhost
+        DocumentRoot /var/www/html
+        RedirectMatch 301 ^/$ /zabbix/
+        ErrorLog ${APACHE_LOG_DIR}/error.log
+        CustomLog ${APACHE_LOG_DIR}/access.log combined
+        SSLEngine on
+        SSLCertificateFile /etc/apache2/ssl/monitoring_https_cert.pem
+        SSLCACertificateFile /etc/apache2/ssl/cacert.pem
+        SSLCertificateKeyFile /etc/apache2/ssl/monitoring_https_key.pem
+    </VirtualHost>
+    ```
+
+    Удалим раздел ``.
+
+    Сохраним изменения, выйдем из редактора (`Esc`, `Shift`+`z`, `Shift`+`z`).
+
+13. Включим модуль веб-сервера для SSL/TLS:
+
+    ```sh
+    sudo a2enmod ssl
+    ```
+
+14. Перезапустим службу веб-сервера:
+
+    ```sh
+    sudo systemctl restart apache2
+    ```
+
+15. Установим правило межсетевого экрана для веб-сервера (HTTPS):
+
+    ```sh
+    sudo ufw allow https
+    ```
+
+16. Проверим подключение по HTTPS: на хосте "Client 2" откроем в веб-браузере адрес <https://monitoring/>, отобразим сертификат сайта и сертификат подписавшего его удостоверяющего центра, добавим сертификат удостоверяющего центра в список доверенных центров сертификации, откроем адрес повторно. Должна отобразиться страница по адресу <https://monitoring/zabbix/> без предупреждений безопасности.
+
+### Настройка базового мониторинга
+
+1. На хосте "Monitoring" откроем файл конфигурации сервера Zabbix:
+
+    ```sh
+    sudo vim /etc/zabbix/zabbix_server.conf
+    ```
+
+2. В файле раскомментируем или допишем строки с параметрами программ "ping" и установим им следующие значения:
+
+    ```config
+    FpingLocation=/usr/bin/fping
+    Fping6Location=/usr/bin/fping6
+    ```
+
+    Сохраним изменения, выйдем из редактора (`Esc`, `Shift`+`z`, `Shift`+`z`).
+
+3. Перезапустим сервер и агент Zabbix:
+
+    ```sh
+    sudo systemctl restart zabbix-server zabbix-agent
+    ```
+
+4. В веб-интерфейсе Zabbix слева в разделе "Data collection" выберем пункт "Host groups".
+
+5. С помощью кнопки справа вверху "Create host group" добавим группы "Admin servers", "Base servers", "Database servers", "Storage servers".
+
+6. В разделе "Data collection" выберем пункт "Templates".
+
+7. В списке шаблонов найдём "ICMP ping", нажмём на "Items" для него. Для каждого из трёх элементов, открыв его, добавим в ключ ("Key") `[{HOST.IP}]`; таким образом, ключи должны быть такие:
+    * `icmpping[{HOST.IP}]`
+    * `icmppingloss[{HOST.IP}]`
+    * `icmppingsec[{HOST.IP}]`
+
+8. В разделе "Data collection" выберем пункт "Hosts".
+
+9. С помощью кнопки справа вверху "Create host" добавим следующие хосты для мониторинга:
+
+    * имя хоста: "access"; отображаемое имя: "Access server"; группы хостов: "Admin servers";
+    * имя хоста: "ca"; отображаемое имя: "Certificate authority server"; группы хостов: "Admin servers";
+    * имя хоста: "dhcp"; отображаемое имя: "DHCP server"; группы хостов: "Base servers";
+    * имя хоста: "ns"; отображаемое имя: "Name server"; группы хостов: "Base servers";
+    * имя хоста: "db1"; отображаемое имя: "MySQL server"; группы хостов: "Database servers";
+    * имя хоста: "db1r"; отображаемое имя: "MySQL replica server"; группы хостов: "Database servers";
+    * имя хоста: "db2"; отображаемое имя: "PostgreSQL server"; группы хостов: "Database servers";
+    * имя хоста: "db2r"; отображаемое имя: "PostgreSQL replica server"; группы хостов: "Database servers";
+    * имя хоста: "smb"; отображаемое имя: "Samba server"; группы хостов: "Storage servers";
+    * имя хоста: "nfs"; отображаемое имя: "NFS server"; группы хостов: "Storage servers".
+
+10. Для каждого из добавленных хостов добавим шаблон "ICMP ping": откроем свойства хоста, начнём вводить "ICMP ping", подтвердим выбор; также добавим интерфейс - агента, укажем IP-адрес и имя соответствующего хоста.
+
+11. Подождём около минуты, затем выберем раздел "Dashboards". При недоступных серверах должны отображаться соответствующие сообщения.

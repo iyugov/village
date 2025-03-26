@@ -244,7 +244,7 @@
 
 #### Настройка fail2ban на сервере
 
-1. На сервере "DB1" установим *fail2ban*:
+1. На сервере "Monitoring" установим *fail2ban*:
 
     ```sh
     sudo apt update

@@ -291,7 +291,7 @@
 
 #### Настройка отправки уведомлений о блокировках доступа на сервер через локальный почтовый сервер
 
-1. На сервере "DB1" установим пакеты `postfix` и `mailutils`:
+1. На сервере "Monitoring" установим пакеты `postfix` и `mailutils`:
 
     ```sh
     sudo apt update
@@ -540,7 +540,7 @@
 4. Создадим файл доменов для сертификата и откроем его в редекторе:
 
     ```sh
-    sudo vim domains.txt
+    sudo vim domains_monitoring.txt
     ```
 
 5. В редакторе обеспечим следующие содержимое файла:
@@ -559,7 +559,7 @@
 6. Подпишем сертификат:
 
     ```sh
-    sudo openssl x509 -req -in requests/monitoring_https.csr -CA cacert.pem -CAkey private/cakey.pem -out newcerts/monitoring_https_cert.pem -days 3653 -CAcreateserial -etxfile domains.txt
+    sudo openssl x509 -req -in requests/monitoring_https.csr -CA cacert.pem -CAkey private/cakey.pem -out newcerts/monitoring_https_cert.pem -days 3653 -CAcreateserial -extfile domains_monitoring.txt
     ```
 
 7. Скопируем необходмые ключи и сертификаты в каталог пользователя для копирования его на серверы по `scp`, перейдём в этот каталог и установим пользователю права на файлы:
